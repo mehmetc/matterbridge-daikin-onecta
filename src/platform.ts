@@ -14,8 +14,9 @@ import type { ActionContext } from 'matterbridge/matter';
 import { FanControl, TemperatureMeasurement, Thermostat } from 'matterbridge/matter/clusters';
 
 import { type ClimateState, endpointSerial, parseClimateStates, toFanPercent, toMatterTemperature } from './mapper.js';
-import { OnectaBridge, RateLimitedError } from './onecta.js';
+import { type DaikinCloudDevice, OnectaBridge, RateLimitedError } from './onecta.js';
 import { formatDeviceTree, pollDelayMs } from './utils.js';
+import { type WriteCommand, applyWriteToState, planFanModeChange, planFanPercentChange, planSetpointChange, planSystemModeChange } from './writes.js';
 
 export type DaikinOnectaPlatformConfig = BasePlatformConfig & {
   clientId: string;
@@ -35,6 +36,12 @@ export type DaikinOnectaPlatformConfig = BasePlatformConfig & {
 /** Delay before retrying after a failed discovery or poll (auth timeout, network error, ...). */
 const RETRY_DELAY_MS = 5 * 60_000;
 
+/** Debounce window for controller writes: a setpoint drag becomes a single PATCH. */
+const WRITE_DEBOUNCE_MS = 1500;
+
+/** Delay before polling after a failed write, to resync the Matter state with reality. */
+const RESYNC_DELAY_MS = 30_000;
+
 export class DaikinOnectaPlatform extends MatterbridgeDynamicPlatform {
   private readonly onecta: DaikinOnectaPlatformConfig;
   private client: OnectaBridge | undefined;
@@ -46,6 +53,13 @@ export class DaikinOnectaPlatform extends MatterbridgeDynamicPlatform {
   private readonly endpoints = new Map<string, MatterbridgeEndpoint>();
   /** Latest parsed state per climateControl serial, applied in onConfigure and on each poll. */
   private readonly lastStates = new Map<string, ClimateState>();
+  /** Cloud device handles keyed by gateway id, used to send commands. */
+  private readonly cloudDevices = new Map<string, DaikinCloudDevice>();
+  /** Debounce timers and pending commands for controller writes, keyed by gatewayId:kind. */
+  private readonly writeTimers = new Map<string, NodeJS.Timeout>();
+  private readonly pendingWrites = new Map<string, WriteCommand[]>();
+  /** Serializes command PATCHes so they never run concurrently. */
+  private writeChain: Promise<void> = Promise.resolve();
 
   constructor(matterbridge: PlatformMatterbridge, log: AnsiLogger, config: DaikinOnectaPlatformConfig) {
     super(matterbridge, log, config);
@@ -101,6 +115,9 @@ export class DaikinOnectaPlatform extends MatterbridgeDynamicPlatform {
     this.stopped = true;
     clearTimeout(this.pollTimer);
     this.pollTimer = undefined;
+    for (const timer of this.writeTimers.values()) clearTimeout(timer);
+    this.writeTimers.clear();
+    this.pendingWrites.clear();
     if (this.config.unregisterOnShutdown) await this.unregisterAllDevices();
   }
 
@@ -141,6 +158,7 @@ export class DaikinOnectaPlatform extends MatterbridgeDynamicPlatform {
         this.log.info(`Fetched ${devices.length} Daikin gateway device(s) from the Onecta cloud:`);
         for (const line of formatDeviceTree(devices)) this.log.info(line);
       }
+      for (const device of devices) this.cloudDevices.set(device.getId(), device);
       const states = devices.flatMap((device) => parseClimateStates(device.getDescription()));
       for (const state of states) {
         const apply = this.discovered;
@@ -195,15 +213,15 @@ export class DaikinOnectaPlatform extends MatterbridgeDynamicPlatform {
       .addRequiredClusters()
       .subscribeAttribute(Thermostat, 'systemMode', (newValue: Thermostat.SystemMode, oldValue: Thermostat.SystemMode, context: ActionContext) => {
         if (context.fabric === undefined) return; // Our own update, not a controller command.
-        this.log.notice(`${state.name}: controller requested systemMode ${oldValue} -> ${newValue}. Control is not implemented yet (M3), the unit is unchanged.`);
+        this.handleWrite(state.gatewayId, 'mode', (current) => planSystemModeChange(current, newValue), `system mode ${newValue}`);
       })
       .subscribeAttribute(Thermostat, 'occupiedHeatingSetpoint', (newValue: number, oldValue: number, context: ActionContext) => {
         if (context.fabric === undefined) return;
-        this.log.notice(`${state.name}: controller requested heating setpoint ${oldValue / 100} -> ${newValue / 100} °C. Control is not implemented yet (M3).`);
+        this.handleWrite(state.gatewayId, 'heatSetpoint', (current) => planSetpointChange(current, 'heating', newValue / 100), `heating setpoint ${newValue / 100} °C`);
       })
       .subscribeAttribute(Thermostat, 'occupiedCoolingSetpoint', (newValue: number, oldValue: number, context: ActionContext) => {
         if (context.fabric === undefined) return;
-        this.log.notice(`${state.name}: controller requested cooling setpoint ${oldValue / 100} -> ${newValue / 100} °C. Control is not implemented yet (M3).`);
+        this.handleWrite(state.gatewayId, 'coolSetpoint', (current) => planSetpointChange(current, 'cooling', newValue / 100), `cooling setpoint ${newValue / 100} °C`);
       });
     await this.registerEndpoint(thermostatEndpoint, state.name, ccSerial);
 
@@ -233,7 +251,11 @@ export class DaikinOnectaPlatform extends MatterbridgeDynamicPlatform {
         .addRequiredClusters()
         .subscribeAttribute(FanControl, 'percentSetting', (newValue: number | null, oldValue: number | null, context: ActionContext) => {
           if (context.fabric === undefined) return;
-          this.log.notice(`${state.name} Fan: controller requested speed ${oldValue} -> ${newValue} %. Control is not implemented yet (M3).`);
+          this.handleWrite(state.gatewayId, 'fan', (current) => planFanPercentChange(current, newValue), `fan ${newValue} %`);
+        })
+        .subscribeAttribute(FanControl, 'fanMode', (newValue: FanControl.FanMode, oldValue: FanControl.FanMode, context: ActionContext) => {
+          if (context.fabric === undefined) return;
+          this.handleWrite(state.gatewayId, 'fan', (current) => planFanModeChange(current, newValue), `fan mode ${newValue}`);
         });
       await this.registerEndpoint(fanEndpoint, `${state.name} Fan`, fanSerial);
     }
@@ -280,6 +302,69 @@ export class DaikinOnectaPlatform extends MatterbridgeDynamicPlatform {
       await fanEndpoint.updateAttribute(FanControl, 'fanMode', this.fanModeFor(state), this.log);
       if (state.fan.mode === 'fixed' && state.fan.speed !== undefined) {
         await fanEndpoint.updateAttribute(FanControl, 'percentCurrent', toFanPercent(state.fan.speed, state.fan.maxSpeed ?? 5), this.log);
+      }
+    }
+  }
+
+  /**
+   * Handle one controller-initiated change: plan the commands from the cached state
+   * and (re)start the debounce window for this write kind.
+   *
+   * @param {string} gatewayId - The gateway device id.
+   * @param {string} kind - Debounce key ("mode", "heatSetpoint", ...); newer plans of the same kind replace older ones.
+   * @param {(state: ClimateState) => WriteCommand[]} plan - Planner invoked with the latest cached state.
+   * @param {string} description - Human-readable description for the log.
+   */
+  private handleWrite(gatewayId: string, kind: string, plan: (state: ClimateState) => WriteCommand[], description: string): void {
+    const state = this.lastStates.get(endpointSerial(gatewayId, 'CC'));
+    if (!state) return;
+    const commands = plan(state);
+    if (commands.length === 0) {
+      this.log.debug(`${state.name}: controller requested ${description}; nothing to send (already matching or unsupported).`);
+      return;
+    }
+    this.log.info(`${state.name}: controller requested ${description}; sending in ${WRITE_DEBOUNCE_MS} ms unless superseded.`);
+    const key = `${gatewayId}:${kind}`;
+    this.pendingWrites.set(key, commands);
+    clearTimeout(this.writeTimers.get(key));
+    const timer = setTimeout(() => {
+      this.writeTimers.delete(key);
+      const pending = this.pendingWrites.get(key);
+      this.pendingWrites.delete(key);
+      if (!pending || this.stopped) return;
+      this.writeChain = this.writeChain.then(async () => this.executeWrite(gatewayId, pending));
+    }, WRITE_DEBOUNCE_MS);
+    timer.unref?.();
+    this.writeTimers.set(key, timer);
+  }
+
+  /**
+   * Send the planned commands to the Daikin cloud and update the cached state optimistically.
+   *
+   * @param {string} gatewayId - The gateway device id.
+   * @param {WriteCommand[]} commands - The commands to send.
+   */
+  private async executeWrite(gatewayId: string, commands: WriteCommand[]): Promise<void> {
+    const device = this.cloudDevices.get(gatewayId);
+    const state = this.lastStates.get(endpointSerial(gatewayId, 'CC'));
+    if (!device || !state || this.stopped) return;
+    try {
+      for (const command of commands) {
+        await device.setData(state.embeddedId, command.dataPoint, command.path ?? undefined, command.value, { updateLocalData: true });
+        applyWriteToState(state, command);
+        this.log.info(`${state.name}: sent ${command.dataPoint}${command.path ?? ''} = ${command.value} to the Daikin cloud.`);
+      }
+      // Defer the next poll a full interval: the write is reflected optimistically and
+      // polling too early can return stale data that would revert the Matter state.
+      this.schedulePoll();
+    } catch (error) {
+      if (this.stopped) return;
+      if (error instanceof RateLimitedError) {
+        this.log.error(`${state.name}: command rejected, the Onecta daily rate limit is reached. The Matter state will resync on the next poll.`);
+        this.schedulePoll((error.retryAfter ?? 3600) * 1000);
+      } else {
+        this.log.error(`${state.name}: sending command failed: ${error instanceof Error ? error.message : String(error)}. Resyncing in ${RESYNC_DELAY_MS / 1000}s.`);
+        this.schedulePoll(RESYNC_DELAY_MS);
       }
     }
   }

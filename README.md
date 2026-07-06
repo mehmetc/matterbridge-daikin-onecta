@@ -2,7 +2,7 @@
 
 A [Matterbridge](https://matterbridge.io/) plugin that bridges **Daikin Onecta** cloud devices (AC units, heat pumps) into **Matter**, so they appear in Apple Home, Home Assistant, Alexa, Google Home and other Matter controllers.
 
-> **Status: early development (M2, read-only).** The plugin authenticates against the official Daikin Onecta API and exposes each AC unit as a Matter **thermostat** (room temperature, heating/cooling setpoints, mode), an **outdoor temperature sensor** and a **fan** device. Values update on every poll. Control from Matter controllers (setpoints, modes, on/off) is the next milestone (M3). See [PLAN.md](PLAN.md) for the roadmap.
+> **Status: beta (M3).** Each AC unit appears as a Matter **thermostat** (room temperature, heating/cooling setpoints, mode incl. on/off), an **outdoor temperature sensor** and a **fan** device — and can be **controlled** from Matter controllers. Controller changes are debounced (a setpoint drag becomes one API call), applied optimistically and confirmed on the next poll. See [PLAN.md](PLAN.md) for the roadmap.
 
 ## Prerequisites
 

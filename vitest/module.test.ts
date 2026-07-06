@@ -126,10 +126,13 @@ const fakeDescription = {
   ],
 };
 
+const setDataMock = vi.fn<() => Promise<boolean>>(async () => true);
+
 const fakeDevice = {
   getId: () => '00000000-0000-4000-8000-000000000001',
   isCloudConnectionUp: () => true,
   getDescription: () => fakeDescription,
+  setData: setDataMock,
 } as unknown as DaikinCloudDevice;
 
 const refreshMock = vi.fn<() => Promise<DaikinCloudDevice[]>>(async () => [fakeDevice]);
@@ -250,6 +253,57 @@ describe('Matterbridge Daikin Onecta plugin', () => {
     expect(mockLog.debug).toHaveBeenCalledWith('Skipping refresh: a previous refresh is still in flight.');
     resolveRefresh([fakeDevice]);
     await startPromise;
+    await platform.onShutdown('Vitest');
+  });
+
+  it('should debounce controller writes and send a single coalesced PATCH', async () => {
+    mockConfig.clientId = 'client-id';
+    mockConfig.clientSecret = 'client-secret';
+    const platform = new TestPlatform(mockMatterbridge, mockLog, mockConfig);
+    // @ts-expect-error Accessing private method for testing purposes
+    platform.setMatterNode(addBridgedEndpoint, removeBridgedEndpoint, removeAllBridgedEndpoints, registerVirtualDevice);
+    await platform.onStart('Vitest');
+    vi.useFakeTimers();
+    // Two rapid setpoint changes: only the last one must be sent.
+    // @ts-expect-error Accessing private method for testing purposes
+    platform.handleWrite(
+      '00000000-0000-4000-8000-000000000001',
+      'coolSetpoint',
+      (state) => [{ dataPoint: 'temperatureControl', path: '/operationModes/cooling/setpoints/roomTemperature', value: 24 }],
+      'cooling setpoint 24 °C',
+    );
+    // @ts-expect-error Accessing private method for testing purposes
+    platform.handleWrite(
+      '00000000-0000-4000-8000-000000000001',
+      'coolSetpoint',
+      (state) => [{ dataPoint: 'temperatureControl', path: '/operationModes/cooling/setpoints/roomTemperature', value: 23.5 }],
+      'cooling setpoint 23.5 °C',
+    );
+    await vi.advanceTimersByTimeAsync(2000);
+    vi.useRealTimers();
+    // Let the write chain settle.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(setDataMock).toHaveBeenCalledTimes(1);
+    expect(setDataMock).toHaveBeenCalledWith('climateControl', 'temperatureControl', '/operationModes/cooling/setpoints/roomTemperature', 23.5, { updateLocalData: true });
+    expect(mockLog.info).toHaveBeenCalledWith(expect.stringContaining('sent temperatureControl/operationModes/cooling/setpoints/roomTemperature = 23.5'));
+    // Optimistic update: the cached state now carries the new setpoint.
+    // @ts-expect-error Accessing private field for testing purposes
+    expect(platform.lastStates.get('000000000000400080000000-CC')?.coolingSetpoint?.value).toBe(23.5);
+    await platform.onShutdown('Vitest');
+  });
+
+  it('should resync with an early poll when a write fails', async () => {
+    mockConfig.clientId = 'client-id';
+    mockConfig.clientSecret = 'client-secret';
+    const platform = new TestPlatform(mockMatterbridge, mockLog, mockConfig);
+    // @ts-expect-error Accessing private method for testing purposes
+    platform.setMatterNode(addBridgedEndpoint, removeBridgedEndpoint, removeAllBridgedEndpoints, registerVirtualDevice);
+    await platform.onStart('Vitest');
+    setDataMock.mockRejectedValueOnce(new Error('cloud says no'));
+    // @ts-expect-error Accessing private method for testing purposes
+    await platform.executeWrite('00000000-0000-4000-8000-000000000001', [{ dataPoint: 'onOffMode', path: null, value: 'on' }]);
+    expect(mockLog.error).toHaveBeenCalledWith(expect.stringContaining('sending command failed: cloud says no'));
+    expect(mockLog.debug).toHaveBeenCalledWith('Next Daikin Onecta poll in 30s');
     await platform.onShutdown('Vitest');
   });
 
