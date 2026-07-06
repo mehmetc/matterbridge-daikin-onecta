@@ -94,13 +94,42 @@ const registerVirtualDevice = jest.fn(async (name: string, type: 'light' | 'outl
 // Mock the logger
 const loggerLogSpy = jest.spyOn(AnsiLogger.prototype, 'log').mockImplementation((level: string, message: string, ...parameters: any[]) => {});
 
+const fakeDescription = {
+  id: '00000000-0000-4000-8000-000000000001',
+  deviceModel: 'Split AC',
+  isCloudConnectionUp: { value: true },
+  managementPoints: [
+    {
+      embeddedId: 'climateControl',
+      managementPointType: 'climateControl',
+      name: { value: 'Room 1' },
+      onOffMode: { value: 'on', values: ['on', 'off'] },
+      operationMode: { value: 'cooling', values: ['heating', 'cooling', 'auto', 'dry', 'fanOnly'] },
+      sensoryData: { value: { roomTemperature: { value: 23 }, outdoorTemperature: { value: 23.5 } } },
+      temperatureControl: {
+        value: {
+          operationModes: {
+            heating: { setpoints: { roomTemperature: { value: 22, minValue: 10, maxValue: 31, stepValue: 0.5, settable: true } } },
+            cooling: { setpoints: { roomTemperature: { value: 25, minValue: 18, maxValue: 33, stepValue: 0.5, settable: true } } },
+            auto: { setpoints: { roomTemperature: { value: 24, minValue: 18, maxValue: 30, stepValue: 0.5, settable: true } } },
+          },
+        },
+      },
+      fanControl: {
+        value: {
+          operationModes: {
+            cooling: { fanSpeed: { currentMode: { value: 'fixed', values: ['auto', 'quiet', 'fixed'] }, modes: { fixed: { value: 3, minValue: 1, maxValue: 5, stepValue: 1 } } } },
+          },
+        },
+      },
+    },
+  ],
+};
+
 const fakeDevice = {
-  getId: () => 'gw-1',
+  getId: () => '00000000-0000-4000-8000-000000000001',
   isCloudConnectionUp: () => true,
-  getDescription: () => ({
-    deviceModel: 'Split AC',
-    managementPoints: [{ embeddedId: 'climateControl', managementPointType: 'climateControl', onOffMode: { value: 'on' } }],
-  }),
+  getDescription: () => fakeDescription,
 } as unknown as DaikinCloudDevice;
 
 const refreshMock = jest.fn<() => Promise<DaikinCloudDevice[]>>(async () => [fakeDevice]);
@@ -160,8 +189,13 @@ describe('Matterbridge Daikin Onecta plugin', () => {
     expect(mockLog.info).toHaveBeenCalledWith('onStart called with reason: none');
     expect(refreshMock).toHaveBeenCalledTimes(1);
     expect(mockLog.info).toHaveBeenCalledWith('Fetched 1 Daikin gateway device(s) from the Onecta cloud:');
-    expect(mockLog.info).toHaveBeenCalledWith('Gateway device gw-1 (model: Split AC, connected: true)');
+    expect(mockLog.info).toHaveBeenCalledWith('Gateway device 00000000-0000-4000-8000-000000000001 (model: Split AC, connected: true)');
     expect(mockLog.debug).toHaveBeenCalledWith(expect.stringContaining('Next Daikin Onecta poll in'));
+    // One thermostat, one outdoor temperature sensor and one fan endpoint are registered.
+    expect(addBridgedEndpoint).toHaveBeenCalledTimes(3);
+    expect(mockLog.info).toHaveBeenCalledWith('Registered Matter endpoint "Room 1" (serial 000000000000400080000000-CC)');
+    expect(mockLog.info).toHaveBeenCalledWith('Registered Matter endpoint "Room 1 Outdoor" (serial 000000000000400080000000-OT)');
+    expect(mockLog.info).toHaveBeenCalledWith('Registered Matter endpoint "Room 1 Fan" (serial 000000000000400080000000-FAN)');
   });
 
   it('should configure', async () => {

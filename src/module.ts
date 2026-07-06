@@ -13,6 +13,7 @@ import { DaikinOnectaPlatform, type DaikinOnectaPlatformConfig } from './platfor
 
 export { DaikinOnectaPlatform, type DaikinOnectaPlatformConfig } from './platform.js';
 export { formatDeviceTree, isDaytime, parseHHMM, pollDelayMs, type DeviceLike, type PollingConfig } from './utils.js';
+export { endpointSerial, parseClimateStates, toFanPercent, toMatterTemperature, type ClimateState, type FanState, type SetpointRange } from './mapper.js';
 
 /**
  * Standard Matterbridge plugin entry point.

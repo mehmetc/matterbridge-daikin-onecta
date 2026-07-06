@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- M2 (read-only bridge): each AC unit is exposed as a Matter thermostat (local temperature, heating/cooling setpoints with device limits, system mode incl. dry/fan-only), an outdoor temperature sensor and a fan device; attributes update on every poll.
+- Climate state mapper with unit tests against a fixture captured from real dx4 units.
 - Initial plugin skeleton scaffolded from the Matterbridge plugin template (M1).
 - OIDC authentication against the official Daikin Onecta API via `daikin-controller-cloud`, with token persistence in the Matterbridge storage directory.
 - Device discovery: fetches all gateway devices with a single API call and logs their management points, characteristics and state.

@@ -59,5 +59,6 @@
     "npx oxlint": true,
     "npx oxfmt": true,
     "npx vitest": true
-  }
+  },
+  "nuxt.isNuxtApp": false
 }
