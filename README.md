@@ -26,16 +26,16 @@ matterbridge --add .
 
 Then configure in the Matterbridge frontend (or `~/.matterbridge/matterbridge-daikin-onecta.config.json`):
 
-| Option                                       | Default          | Description                                                                                     |
-| -------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------- |
-| `clientId` / `clientSecret`                  | —                | Credentials of your Daikin Developer Portal app.                                                 |
-| `callbackPort`                               | `8582`           | Port of the local HTTPS OAuth callback server; must match the registered redirect URI.           |
-| `externalAddress`                            | detected LAN IP  | Address of this machine as reachable from your browser during authorization.                     |
-| `pollingIntervalDay` / `pollingIntervalNight`| `10` / `30` min  | Cloud polling intervals inside/outside the day window.                                           |
-| `dayStart` / `dayEnd`                        | `07:00` / `22:00`| The day window.                                                                                  |
-| `exposeOutdoorTemperature`                   | `true`           | Expose the outdoor temperature as a Matter sensor (M2).                                          |
-| `exposeFan`                                  | `true`           | Expose AC fan speed as a Matter fan device (M2).                                                 |
-| `whiteList` / `blackList`                    | empty            | Limit which devices are exposed.                                                                 |
+| Option                                        | Default           | Description                                                                            |
+| --------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------- |
+| `clientId` / `clientSecret`                   | —                 | Credentials of your Daikin Developer Portal app.                                       |
+| `callbackPort`                                | `8582`            | Port of the local HTTPS OAuth callback server; must match the registered redirect URI. |
+| `externalAddress`                             | detected LAN IP   | Address of this machine as reachable from your browser during authorization.           |
+| `pollingIntervalDay` / `pollingIntervalNight` | `10` / `30` min   | Cloud polling intervals inside/outside the day window.                                 |
+| `dayStart` / `dayEnd`                         | `07:00` / `22:00` | The day window.                                                                        |
+| `exposeOutdoorTemperature`                    | `true`            | Expose the outdoor temperature as a Matter sensor (M2).                                |
+| `exposeFan`                                   | `true`            | Expose AC fan speed as a Matter fan device (M2).                                       |
+| `whiteList` / `blackList`                     | empty             | Limit which devices are exposed.                                                       |
 
 ### First authorization
 

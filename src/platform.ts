@@ -36,6 +36,8 @@ export class DaikinOnectaPlatform extends MatterbridgeDynamicPlatform {
   private readonly onecta: DaikinOnectaPlatformConfig;
   private client: OnectaBridge | undefined;
   private pollTimer: NodeJS.Timeout | undefined;
+  private stopped = false;
+  private refreshing = false;
 
   constructor(matterbridge: PlatformMatterbridge, log: AnsiLogger, config: DaikinOnectaPlatformConfig) {
     super(matterbridge, log, config);
@@ -64,6 +66,7 @@ export class DaikinOnectaPlatform extends MatterbridgeDynamicPlatform {
       return;
     }
 
+    this.stopped = false;
     this.client = this.createClient();
     await this.refreshDevices();
   }
@@ -81,6 +84,9 @@ export class DaikinOnectaPlatform extends MatterbridgeDynamicPlatform {
   override async onShutdown(reason?: string): Promise<void> {
     await super.onShutdown(reason);
     this.log.info(`onShutdown called with reason: ${reason ?? 'none'}`);
+    // In-flight authorization attempts cannot be aborted (the library offers no cancel API);
+    // `stopped` makes sure their continuations never log or schedule on this dead instance.
+    this.stopped = true;
     clearTimeout(this.pollTimer);
     this.pollTimer = undefined;
     if (this.config.unregisterOnShutdown) await this.unregisterAllDevices();
@@ -108,13 +114,22 @@ export class DaikinOnectaPlatform extends MatterbridgeDynamicPlatform {
 
   /** Fetch all devices with one API call, log the result and schedule the next poll. */
   private async refreshDevices(): Promise<void> {
-    if (!this.client) return;
+    if (!this.client || this.stopped) return;
+    if (this.refreshing) {
+      // A refresh (possibly a first-time authorization taking up to 10 minutes) is already
+      // in flight; starting another one would collide on the OAuth callback port.
+      this.log.debug('Skipping refresh: a previous refresh is still in flight.');
+      return;
+    }
+    this.refreshing = true;
     try {
       const devices = await this.client.refresh();
+      if (this.stopped) return;
       this.log.info(`Fetched ${devices.length} Daikin gateway device(s) from the Onecta cloud:`);
       for (const line of formatDeviceTree(devices)) this.log.info(line);
       this.schedulePoll();
     } catch (error) {
+      if (this.stopped) return;
       if (error instanceof RateLimitedError) {
         const delay = (error.retryAfter ?? 3600) * 1000;
         this.log.warn(`Daikin Onecta API daily rate limit reached. Next poll in ${Math.round(delay / 60_000)} minutes.`);
@@ -123,10 +138,13 @@ export class DaikinOnectaPlatform extends MatterbridgeDynamicPlatform {
         this.log.error(`Fetching Daikin devices failed: ${error instanceof Error ? error.message : String(error)}. Retrying in ${RETRY_DELAY_MS / 60_000} minutes.`);
         this.schedulePoll(RETRY_DELAY_MS);
       }
+    } finally {
+      this.refreshing = false;
     }
   }
 
   private schedulePoll(delayMs?: number): void {
+    if (this.stopped) return;
     clearTimeout(this.pollTimer);
     const delay = delayMs ?? pollDelayMs(this.onecta);
     this.log.debug(`Next Daikin Onecta poll in ${Math.round(delay / 1000)}s`);

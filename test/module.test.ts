@@ -187,6 +187,38 @@ describe('Matterbridge Daikin Onecta plugin', () => {
     expect(mockLog.error).toHaveBeenCalledWith(expect.stringContaining('Fetching Daikin devices failed: boom'));
   });
 
+  it('should not log or reschedule when shut down during an in-flight refresh', async () => {
+    let resolveRefresh!: (devices: DaikinCloudDevice[]) => void;
+    refreshMock.mockImplementationOnce(async () => new Promise<DaikinCloudDevice[]>((resolve) => (resolveRefresh = resolve)));
+    const platform = new TestPlatform(mockMatterbridge, mockLog, mockConfig);
+    // @ts-expect-error Accessing private method for testing purposes
+    platform.setMatterNode(addBridgedEndpoint, removeBridgedEndpoint, removeAllBridgedEndpoints, registerVirtualDevice);
+    const startPromise = platform.onStart('Jest');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await platform.onShutdown('Jest');
+    jest.clearAllMocks();
+    resolveRefresh([fakeDevice]);
+    await startPromise;
+    expect(mockLog.info).not.toHaveBeenCalledWith(expect.stringContaining('Fetched'));
+    expect(mockLog.debug).not.toHaveBeenCalledWith(expect.stringContaining('Next Daikin Onecta poll'));
+  });
+
+  it('should skip a refresh while another is in flight', async () => {
+    let resolveRefresh!: (devices: DaikinCloudDevice[]) => void;
+    refreshMock.mockImplementationOnce(async () => new Promise<DaikinCloudDevice[]>((resolve) => (resolveRefresh = resolve)));
+    const platform = new TestPlatform(mockMatterbridge, mockLog, mockConfig);
+    // @ts-expect-error Accessing private method for testing purposes
+    platform.setMatterNode(addBridgedEndpoint, removeBridgedEndpoint, removeAllBridgedEndpoints, registerVirtualDevice);
+    const startPromise = platform.onStart('Jest');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    // @ts-expect-error Accessing private method for testing purposes
+    await platform.refreshDevices();
+    expect(mockLog.debug).toHaveBeenCalledWith('Skipping refresh: a previous refresh is still in flight.');
+    resolveRefresh([fakeDevice]);
+    await startPromise;
+    await platform.onShutdown('Jest');
+  });
+
   it('should shutdown', async () => {
     await instance.onShutdown('Jest');
     expect(mockLog.info).toHaveBeenCalledWith('onShutdown called with reason: Jest');
