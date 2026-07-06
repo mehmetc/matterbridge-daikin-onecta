@@ -42,6 +42,10 @@ export interface ClimateState {
   coolingSetpoint?: SetpointRange;
   autoSetpoint?: SetpointRange;
   fan?: FanState;
+  /** Powerful/boost mode; undefined when the unit does not support it. */
+  powerful?: boolean;
+  /** % from sensoryData, present on some units. */
+  roomHumidity?: number;
 }
 
 const isRecord = (data: unknown): data is Record<string, unknown> => data !== null && typeof data === 'object';
@@ -142,9 +146,12 @@ export function parseClimateStates(desc: Record<string, unknown>): ClimateState[
       autoSetpoint: modeSetpoint(point.temperatureControl, 'auto'),
       fan: modeFan(point.fanControl, operationMode),
     };
+    const powerful = valueOf(point.powerfulMode);
+    if (powerful === 'on' || powerful === 'off') state.powerful = powerful === 'on';
     if (isRecord(sensoryData)) {
       state.roomTemperature = numberOf(sensoryData.roomTemperature);
       state.outdoorTemperature = numberOf(sensoryData.outdoorTemperature);
+      state.roomHumidity = numberOf(sensoryData.roomHumidity);
     }
     states.push(state);
   }

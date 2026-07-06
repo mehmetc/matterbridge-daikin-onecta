@@ -10,6 +10,7 @@
   "dayEnd": "22:00",
   "exposeOutdoorTemperature": true,
   "exposeFan": true,
+  "exposeSwitches": true,
   "whiteList": [],
   "blackList": [],
   "debug": false,

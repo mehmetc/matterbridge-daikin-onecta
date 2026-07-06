@@ -8,15 +8,25 @@
 
 import path from 'node:path';
 
-import { type BasePlatformConfig, MatterbridgeDynamicPlatform, MatterbridgeEndpoint, type PlatformMatterbridge, fan, temperatureSensor, thermostat } from 'matterbridge';
+import {
+  type BasePlatformConfig,
+  MatterbridgeDynamicPlatform,
+  MatterbridgeEndpoint,
+  type PlatformMatterbridge,
+  fan,
+  humiditySensor,
+  onOffSwitch,
+  temperatureSensor,
+  thermostat,
+} from 'matterbridge';
 import type { AnsiLogger, LogLevel } from 'matterbridge/logger';
 import type { ActionContext } from 'matterbridge/matter';
-import { FanControl, TemperatureMeasurement, Thermostat } from 'matterbridge/matter/clusters';
+import { FanControl, OnOff, RelativeHumidityMeasurement, TemperatureMeasurement, Thermostat } from 'matterbridge/matter/clusters';
 
 import { type ClimateState, endpointSerial, parseClimateStates, toFanPercent, toMatterTemperature } from './mapper.js';
 import { type DaikinCloudDevice, OnectaBridge, RateLimitedError } from './onecta.js';
 import { formatDeviceTree, pollDelayMs } from './utils.js';
-import { type WriteCommand, applyWriteToState, planFanModeChange, planFanPercentChange, planSetpointChange, planSystemModeChange } from './writes.js';
+import { type WriteCommand, applyWriteToState, planFanModeChange, planFanPercentChange, planPowerfulChange, planSetpointChange, planSystemModeChange } from './writes.js';
 
 export type DaikinOnectaPlatformConfig = BasePlatformConfig & {
   clientId: string;
@@ -29,6 +39,7 @@ export type DaikinOnectaPlatformConfig = BasePlatformConfig & {
   dayEnd: string;
   exposeOutdoorTemperature: boolean;
   exposeFan: boolean;
+  exposeSwitches: boolean;
   whiteList: string[];
   blackList: string[];
 };
@@ -242,6 +253,46 @@ export class DaikinOnectaPlatform extends MatterbridgeDynamicPlatform {
       await this.registerEndpoint(sensor, `${state.name} Outdoor`, otSerial);
     }
 
+    if (state.roomHumidity !== undefined) {
+      const humSerial = endpointSerial(state.gatewayId, 'HUM');
+      const humidity = new MatterbridgeEndpoint(humiditySensor, { id: humSerial })
+        .createDefaultBridgedDeviceBasicInformationClusterServer(
+          `${state.name} Humidity`,
+          humSerial,
+          this.matterbridge.aggregatorVendorId,
+          'Daikin',
+          'Onecta Humidity Sensor',
+          1,
+          '0.1.0',
+        )
+        .createDefaultRelativeHumidityMeasurementClusterServer(Math.round(state.roomHumidity * 100))
+        .addRequiredClusters();
+      await this.registerEndpoint(humidity, `${state.name} Humidity`, humSerial);
+    }
+
+    if (this.onecta.exposeSwitches && state.powerful !== undefined) {
+      const pwrSerial = endpointSerial(state.gatewayId, 'PWR');
+      const powerfulSwitch = new MatterbridgeEndpoint(onOffSwitch, { id: pwrSerial })
+        .createDefaultBridgedDeviceBasicInformationClusterServer(
+          `${state.name} Powerful`,
+          pwrSerial,
+          this.matterbridge.aggregatorVendorId,
+          'Daikin',
+          'Onecta Powerful Mode',
+          1,
+          '0.1.0',
+        )
+        .createDefaultOnOffClusterServer(state.powerful)
+        .addRequiredClusters()
+        .addCommandHandler('on', () => {
+          this.handleWrite(state.gatewayId, 'powerful', (current) => planPowerfulChange(current, true), 'powerful mode on');
+        })
+        .addCommandHandler('off', () => {
+          this.handleWrite(state.gatewayId, 'powerful', (current) => planPowerfulChange(current, false), 'powerful mode off');
+        });
+      await this.registerEndpoint(powerfulSwitch, `${state.name} Powerful`, pwrSerial);
+    }
+
     if (this.onecta.exposeFan && state.fan) {
       const fanSerial = endpointSerial(state.gatewayId, 'FAN');
       const percent = state.fan.mode === 'fixed' && state.fan.speed !== undefined ? toFanPercent(state.fan.speed, state.fan.maxSpeed ?? 5) : 0;
@@ -295,6 +346,16 @@ export class DaikinOnectaPlatform extends MatterbridgeDynamicPlatform {
     const sensorEndpoint = this.endpoints.get(endpointSerial(state.gatewayId, 'OT'));
     if (sensorEndpoint && state.outdoorTemperature !== undefined) {
       await sensorEndpoint.updateAttribute(TemperatureMeasurement, 'measuredValue', toMatterTemperature(state.outdoorTemperature), this.log);
+    }
+
+    const humidityEndpoint = this.endpoints.get(endpointSerial(state.gatewayId, 'HUM'));
+    if (humidityEndpoint && state.roomHumidity !== undefined) {
+      await humidityEndpoint.updateAttribute(RelativeHumidityMeasurement, 'measuredValue', Math.round(state.roomHumidity * 100), this.log);
+    }
+
+    const powerfulEndpoint = this.endpoints.get(endpointSerial(state.gatewayId, 'PWR'));
+    if (powerfulEndpoint && state.powerful !== undefined) {
+      await powerfulEndpoint.updateAttribute(OnOff, 'onOff', state.powerful, this.log);
     }
 
     const fanEndpoint = this.endpoints.get(endpointSerial(state.gatewayId, 'FAN'));

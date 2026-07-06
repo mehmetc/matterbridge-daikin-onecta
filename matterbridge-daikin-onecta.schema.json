@@ -77,6 +77,12 @@
       "type": "boolean",
       "default": true
     },
+    "exposeSwitches": {
+      "title": "Expose Switches",
+      "description": "Expose extra features (powerful/boost mode) as Matter on/off switches.",
+      "type": "boolean",
+      "default": true
+    },
     "whiteList": {
       "title": "White List",
       "description": "Only the devices in the list will be exposed. If the list is empty, all the devices will be exposed.",

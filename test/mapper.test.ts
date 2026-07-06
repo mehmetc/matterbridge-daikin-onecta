@@ -31,6 +31,17 @@ describe('parseClimateStates', () => {
     expect(state.heatingSetpoint).toMatchObject({ min: 10, max: 31 });
     expect(state.autoSetpoint).toMatchObject({ min: 18, max: 30 });
     expect(state.fan).toEqual({ mode: 'auto', speed: 1, maxSpeed: 5 });
+    expect(state.powerful).toBe(false);
+    expect(state.roomHumidity).toBeUndefined();
+  });
+
+  test('should parse humidity when the unit reports it', () => {
+    const [state] = parseClimateStates({
+      id: 'gw-h',
+      managementPoints: [{ managementPointType: 'climateControl', embeddedId: 'cc', sensoryData: { value: { roomHumidity: { value: 52 } } } }],
+    });
+    expect(state.roomHumidity).toBe(52);
+    expect(state.powerful).toBeUndefined();
   });
 
   test('should return an empty list for devices without climateControl', () => {
@@ -48,6 +59,7 @@ describe('parseClimateStates', () => {
     expect(state.roomTemperature).toBeUndefined();
     expect(state.heatingSetpoint).toBeUndefined();
     expect(state.fan).toBeUndefined();
+    expect(state.powerful).toBeUndefined();
   });
 });
 

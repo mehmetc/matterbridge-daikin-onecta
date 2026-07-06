@@ -79,6 +79,7 @@ const mockConfig: DaikinOnectaPlatformConfig = {
   dayEnd: '22:00',
   exposeOutdoorTemperature: true,
   exposeFan: true,
+  exposeSwitches: true,
   whiteList: [],
   blackList: [],
   debug: false,
@@ -104,6 +105,7 @@ const fakeDescription = {
       managementPointType: 'climateControl',
       name: { value: 'Room 1' },
       onOffMode: { value: 'on', values: ['on', 'off'] },
+      powerfulMode: { value: 'off', values: ['on', 'off'], settable: true },
       operationMode: { value: 'cooling', values: ['heating', 'cooling', 'auto', 'dry', 'fanOnly'] },
       sensoryData: { value: { roomTemperature: { value: 23 }, outdoorTemperature: { value: 23.5 } } },
       temperatureControl: {
@@ -194,10 +196,11 @@ describe('Matterbridge Daikin Onecta plugin', () => {
     expect(mockLog.info).toHaveBeenCalledWith('Fetched 1 Daikin gateway device(s) from the Onecta cloud:');
     expect(mockLog.info).toHaveBeenCalledWith('Gateway device 00000000-0000-4000-8000-000000000001 (model: Split AC, connected: true)');
     expect(mockLog.debug).toHaveBeenCalledWith(expect.stringContaining('Next Daikin Onecta poll in'));
-    // One thermostat, one outdoor temperature sensor and one fan endpoint are registered.
-    expect(addBridgedEndpoint).toHaveBeenCalledTimes(3);
+    // Thermostat, outdoor temperature sensor, powerful switch and fan endpoints are registered.
+    expect(addBridgedEndpoint).toHaveBeenCalledTimes(4);
     expect(mockLog.info).toHaveBeenCalledWith('Registered Matter endpoint "Room 1" (serial 000000000000400080000000-CC)');
     expect(mockLog.info).toHaveBeenCalledWith('Registered Matter endpoint "Room 1 Outdoor" (serial 000000000000400080000000-OT)');
+    expect(mockLog.info).toHaveBeenCalledWith('Registered Matter endpoint "Room 1 Powerful" (serial 000000000000400080000000-PWR)');
     expect(mockLog.info).toHaveBeenCalledWith('Registered Matter endpoint "Room 1 Fan" (serial 000000000000400080000000-FAN)');
   });
 

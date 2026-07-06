@@ -136,6 +136,18 @@ export function planFanModeChange(state: ClimateState, fanMode: FanControl.FanMo
 }
 
 /**
+ * Plan the command for a powerful/boost mode switch change.
+ *
+ * @param {ClimateState} state - The cached state of the unit.
+ * @param {boolean} on - The requested switch state.
+ * @returns {WriteCommand[]} The command to send (may be empty).
+ */
+export function planPowerfulChange(state: ClimateState, on: boolean): WriteCommand[] {
+  if (state.powerful === undefined || state.powerful === on) return [];
+  return [{ dataPoint: 'powerfulMode', path: null, value: on ? 'on' : 'off' }];
+}
+
+/**
  * Apply a successfully sent command to the cached state, so follow-up planning
  * and Matter updates use the new values until the next cloud poll confirms them.
  *
@@ -145,6 +157,10 @@ export function planFanModeChange(state: ClimateState, fanMode: FanControl.FanMo
 export function applyWriteToState(state: ClimateState, command: WriteCommand): void {
   if (command.dataPoint === 'onOffMode') {
     state.onOff = command.value === 'on';
+    return;
+  }
+  if (command.dataPoint === 'powerfulMode') {
+    state.powerful = command.value === 'on';
     return;
   }
   if (command.dataPoint === 'operationMode') {

@@ -9,7 +9,7 @@ import { FanControl, Thermostat } from 'matterbridge/matter/clusters';
 import { describe, expect, test } from 'vitest';
 
 import { parseClimateStates, type ClimateState } from '../src/mapper.js';
-import { applyWriteToState, clampSetpoint, planFanModeChange, planFanPercentChange, planSetpointChange, planSystemModeChange } from '../src/writes.js';
+import { applyWriteToState, clampSetpoint, planFanModeChange, planFanPercentChange, planPowerfulChange, planSetpointChange, planSystemModeChange } from '../src/writes.js';
 
 const fixture = JSON.parse(readFileSync(path.join(import.meta.dirname, '..', 'test', 'fixtures', 'gateway-devices.json'), 'utf8')) as Record<string, unknown>[];
 
@@ -134,6 +134,14 @@ describe('planFanModeChange', () => {
   });
 });
 
+describe('planPowerfulChange', () => {
+  test('should toggle powerful mode', () => {
+    expect(planPowerfulChange(freshState(), true)).toEqual([{ dataPoint: 'powerfulMode', path: null, value: 'on' }]);
+    expect(planPowerfulChange(freshState(), false)).toEqual([]);
+    expect(planPowerfulChange({ ...freshState(), powerful: undefined }, true)).toEqual([]);
+  });
+});
+
 describe('applyWriteToState', () => {
   test('should apply power, mode, setpoint and fan writes', () => {
     const state = freshState();
@@ -141,6 +149,8 @@ describe('applyWriteToState', () => {
     expect(state.onOff).toBe(true);
     applyWriteToState(state, { dataPoint: 'operationMode', path: null, value: 'heating' });
     expect(state.operationMode).toBe('heating');
+    applyWriteToState(state, { dataPoint: 'powerfulMode', path: null, value: 'on' });
+    expect(state.powerful).toBe(true);
     applyWriteToState(state, { dataPoint: 'temperatureControl', path: '/operationModes/cooling/setpoints/roomTemperature', value: 24 });
     expect(state.coolingSetpoint?.value).toBe(24);
     applyWriteToState(state, { dataPoint: 'fanControl', path: '/operationModes/cooling/fanSpeed/currentMode', value: 'fixed' });
