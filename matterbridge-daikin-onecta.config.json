@@ -1,0 +1,17 @@
+{
+  "name": "matterbridge-daikin-onecta",
+  "type": "DynamicPlatform",
+  "clientId": "",
+  "clientSecret": "",
+  "callbackPort": 8582,
+  "pollingIntervalDay": 10,
+  "pollingIntervalNight": 30,
+  "dayStart": "07:00",
+  "dayEnd": "22:00",
+  "exposeOutdoorTemperature": true,
+  "exposeFan": true,
+  "whiteList": [],
+  "blackList": [],
+  "debug": false,
+  "unregisterOnShutdown": false
+}

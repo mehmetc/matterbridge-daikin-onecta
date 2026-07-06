@@ -1,0 +1,113 @@
+{
+  "title": "Matterbridge Daikin Onecta plugin",
+  "description": "Bridges Daikin Onecta cloud devices (AC units, heat pumps) into Matter. Requires an app on the Daikin Developer Portal (https://developer.cloud.daikineurope.com).",
+  "type": "object",
+  "properties": {
+    "name": {
+      "title": "Plugin Name",
+      "description": "Plugin name",
+      "type": "string",
+      "readOnly": true,
+      "ui:widget": "hidden"
+    },
+    "type": {
+      "title": "Plugin Type",
+      "description": "Plugin type",
+      "type": "string",
+      "readOnly": true,
+      "ui:widget": "hidden"
+    },
+    "clientId": {
+      "title": "Client ID",
+      "description": "OAuth Client ID of your app on the Daikin Developer Portal.",
+      "type": "string"
+    },
+    "clientSecret": {
+      "title": "Client Secret",
+      "description": "OAuth Client Secret of your app on the Daikin Developer Portal.",
+      "type": "string",
+      "ui:widget": "password"
+    },
+    "callbackPort": {
+      "title": "OAuth Callback Port",
+      "description": "Port for the local HTTPS authorization callback server. The redirect URI registered on the Daikin Developer Portal must be https://<this machine's IP>:<this port>.",
+      "type": "number",
+      "default": 8582
+    },
+    "externalAddress": {
+      "title": "External Address",
+      "description": "Address of this machine as reachable from your browser during authorization. Leave empty to use the detected LAN address.",
+      "type": "string"
+    },
+    "pollingIntervalDay": {
+      "title": "Polling Interval Day (minutes)",
+      "description": "How often to poll the Daikin cloud during the day window. The Onecta API allows only 200 calls per day, so keep this at 10 or higher.",
+      "type": "number",
+      "default": 10,
+      "minimum": 5
+    },
+    "pollingIntervalNight": {
+      "title": "Polling Interval Night (minutes)",
+      "description": "How often to poll the Daikin cloud outside the day window.",
+      "type": "number",
+      "default": 30,
+      "minimum": 5
+    },
+    "dayStart": {
+      "title": "Day Window Start",
+      "description": "Start of the day polling window (HH:MM).",
+      "type": "string",
+      "default": "07:00"
+    },
+    "dayEnd": {
+      "title": "Day Window End",
+      "description": "End of the day polling window (HH:MM).",
+      "type": "string",
+      "default": "22:00"
+    },
+    "exposeOutdoorTemperature": {
+      "title": "Expose Outdoor Temperature",
+      "description": "Expose the outdoor unit temperature as a Matter temperature sensor.",
+      "type": "boolean",
+      "default": true
+    },
+    "exposeFan": {
+      "title": "Expose Fan Control",
+      "description": "Expose the fan speed of AC units as a Matter fan device.",
+      "type": "boolean",
+      "default": true
+    },
+    "whiteList": {
+      "title": "White List",
+      "description": "Only the devices in the list will be exposed. If the list is empty, all the devices will be exposed.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "selectFrom": "name"
+    },
+    "blackList": {
+      "title": "Black List",
+      "description": "The devices in the list will not be exposed. If the list is empty, no devices will be excluded.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "selectFrom": "name"
+    },
+    "debug": {
+      "title": "Enable Debug",
+      "description": "Enable debug mode for the plugin. Only for debugging purposes, not recommended for production use.",
+      "type": "boolean",
+      "default": false
+    },
+    "unregisterOnShutdown": {
+      "title": "Unregister On Shutdown",
+      "description": "Unregister all devices on shutdown. Only for debugging purposes, not recommended for production use.",
+      "type": "boolean",
+      "default": false
+    }
+  }
+}
