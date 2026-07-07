@@ -1,3 +1,8 @@
+> **Superseded:** the plugin is now published to npm — on the Pi just type
+> `matterbridge-daikin-onecta` in the frontend's **Install plugins** field
+> (see README). Steps 3-7 below (configure, restart, portal redirect URI,
+> authorize, re-pair) still apply as written.
+
 # Deploying to the Pi (192.168.10.5) — manual steps
 
 State: the plugin tarball is already uploaded to the Pi at

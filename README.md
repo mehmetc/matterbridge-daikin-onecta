@@ -1,5 +1,9 @@
 # matterbridge-daikin-onecta
 
+[![npm version](https://img.shields.io/npm/v/matterbridge-daikin-onecta.svg)](https://www.npmjs.com/package/matterbridge-daikin-onecta)
+[![npm downloads](https://img.shields.io/npm/dt/matterbridge-daikin-onecta.svg)](https://www.npmjs.com/package/matterbridge-daikin-onecta)
+[![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 A [Matterbridge](https://matterbridge.io/) plugin that bridges **Daikin Onecta** cloud devices (AC units, heat pumps) into **Matter**, so they appear in Apple Home, Home Assistant, Alexa, Google Home and other Matter controllers.
 
 > **Status: beta (M4).** Each AC unit appears as a Matter **thermostat** (room temperature, heating/cooling setpoints, mode incl. on/off), an **outdoor temperature sensor**, a **fan** device, a **powerful/boost mode switch**, and a **humidity sensor** on units that report it — all **controllable** from Matter controllers. Controller changes are debounced (a setpoint drag becomes one API call), applied optimistically and confirmed on the next poll. See [PLAN.md](PLAN.md) for the roadmap.
@@ -12,15 +16,16 @@ A [Matterbridge](https://matterbridge.io/) plugin that bridges **Daikin Onecta**
 
 ## Installation
 
-Until the plugin is published to npm, install from source:
+In the Matterbridge frontend, type `matterbridge-daikin-onecta` in the **Install plugins** field and install — that's it. Update the same way when a new version is released (the frontend shows available updates).
+
+Command line alternative:
 
 ```bash
-git clone <this repo> && cd matterbridge-daikin-onecta
-npm install
-npm link matterbridge
-npm run build
-matterbridge --add .
+npm install -g matterbridge-daikin-onecta
+matterbridge --add matterbridge-daikin-onecta
 ```
+
+> Running Matterbridge in Docker? Install via the frontend as above; after a container image update just reinstall the same way.
 
 ## Authorization guide
 
@@ -109,6 +114,16 @@ Set in the Matterbridge frontend (or `~/.matterbridge/matterbridge-daikin-onecta
 The Onecta API allows only **200 calls per user per day**. The default polling settings (~120 calls/day) leave headroom for commands. The plugin reads the rate-limit headers, logs the remaining budget at debug level, and backs off automatically when the limit is reached.
 
 ## Development
+
+To develop from source:
+
+```bash
+git clone https://github.com/mehmetc/matterbridge-daikin-onecta.git && cd matterbridge-daikin-onecta
+npm install
+npm link matterbridge   # requires a matterbridge dev install, see the Matterbridge dev guide
+npm run build
+matterbridge --add .
+```
 
 ```bash
 npm run build      # compile

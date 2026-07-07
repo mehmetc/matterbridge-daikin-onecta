@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.0] - 2026-07-06 (unreleased)
+## [0.1.0] - 2026-07-07
+
+First release, published to npm.
 
 ### Added
 
