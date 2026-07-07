@@ -98,7 +98,8 @@ jobs:
         if: steps.check_configs.outputs.has_jest == 'true'
         shell: bash
         run: |
-          npm run test:coverage -- --testTimeout=30000
+          # Collect coverage without the 100% publish-gate thresholds: this workflow reports coverage, it does not gate on it.
+          npm run test -- --coverage --testTimeout=30000
           test -f ./coverage/jest/lcov.info || { echo "::error::Jest ran but lcov.info missing"; exit 1; }
 
       - name: Run Vitest tests
@@ -106,9 +107,9 @@ jobs:
         shell: bash
         run: |
           if [ "${{ steps.check_configs.outputs.has_jest }}" == "true" ]; then
-            npm run test:vitest:coverage -- --testTimeout=30000
+            npm run test:vitest -- --coverage --testTimeout=30000
           else
-            npm run test:coverage -- --testTimeout=30000
+            npm run test -- --coverage --testTimeout=30000
           fi
           test -f ./coverage/vitest/lcov.info || { echo "::error::Vitest ran but lcov.info missing"; exit 1; }
 
@@ -116,4 +117,5 @@ jobs:
         uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
+          # No CODECOV_TOKEN secret is configured (yet); don't fail CI on upload problems.
+          fail_ci_if_error: false
