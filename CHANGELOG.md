@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.1] - 2026-07-07
+
+### Fixed
+
+- The powerful mode switch now uses the correct Matter device type `mountedOnOffControl` (0x010f) instead of the deprecated `onOffSwitch` client device type — it appears as a proper controllable switch in Apple Home and Home Assistant.
+- CI stability: flaky in-flight refresh tests, coverage workflow no longer gates on the 100% publish threshold, and the publish script restores the development state even when publishing fails.
+
 ## [0.1.0] - 2026-07-07
 
 First release, published to npm.
