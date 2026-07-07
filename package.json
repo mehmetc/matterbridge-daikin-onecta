@@ -1,6 +1,6 @@
 {
   "name": "matterbridge-daikin-onecta",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Matterbridge plugin that bridges Daikin Onecta cloud devices (AC, heat pumps) into Matter",
   "author": "Mehmet Celik",
   "license": "Apache-2.0",
@@ -108,7 +108,7 @@
     "npmPack": "npx shx cp package.json package.json.backup && node scripts/version.mjs dev && npm run prepublishOnly && npm pack && npx shx cp package.json.backup package.json && npx shx rm -f package.json.backup && npm run reset",
     "npmPublishTagDev": "npx shx cp package.json package.json.backup && node scripts/version.mjs dev && npm run prepublishOnly && npm publish --tag dev && npx shx cp package.json.backup package.json && npx shx rm -f package.json.backup && npm run reset",
     "npmPublishTagEdge": "npx shx cp package.json package.json.backup && node scripts/version.mjs edge && npm run prepublishOnly && npm publish --tag edge && npx shx cp package.json.backup package.json && npx shx rm -f package.json.backup && npm run reset",
-    "npmPublishTagLatest": "npx shx cp package.json package.json.backup && npm run prepublishOnly && npm publish --tag latest && npx shx cp package.json.backup package.json && npx shx rm -f package.json.backup && npm run reset"
+    "npmPublishTagLatest": "node scripts/publish.mjs latest"
   },
   "dependencies": {
     "daikin-controller-cloud": "^2.4.3",
