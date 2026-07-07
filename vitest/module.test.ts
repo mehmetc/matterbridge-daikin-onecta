@@ -234,7 +234,8 @@ describe('Matterbridge Daikin Onecta plugin', () => {
     // @ts-expect-error Accessing private method for testing purposes
     platform.setMatterNode(addBridgedEndpoint, removeBridgedEndpoint, removeAllBridgedEndpoints, registerVirtualDevice);
     const startPromise = platform.onStart('Vitest');
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    // Wait until the refresh is actually in flight (fixed delays are racy on slow runners).
+    while (refreshMock.mock.calls.length === 0) await new Promise((resolve) => setTimeout(resolve, 5));
     await platform.onShutdown('Vitest');
     vi.clearAllMocks();
     resolveRefresh([fakeDevice]);
@@ -250,7 +251,8 @@ describe('Matterbridge Daikin Onecta plugin', () => {
     // @ts-expect-error Accessing private method for testing purposes
     platform.setMatterNode(addBridgedEndpoint, removeBridgedEndpoint, removeAllBridgedEndpoints, registerVirtualDevice);
     const startPromise = platform.onStart('Vitest');
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    // Wait until the refresh is actually in flight (fixed delays are racy on slow runners).
+    while (refreshMock.mock.calls.length === 0) await new Promise((resolve) => setTimeout(resolve, 5));
     // @ts-expect-error Accessing private method for testing purposes
     await platform.refreshDevices();
     expect(mockLog.debug).toHaveBeenCalledWith('Skipping refresh: a previous refresh is still in flight.');
