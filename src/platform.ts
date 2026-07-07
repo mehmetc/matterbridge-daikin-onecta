@@ -15,7 +15,7 @@ import {
   type PlatformMatterbridge,
   fan,
   humiditySensor,
-  onOffSwitch,
+  onOffMountedSwitch,
   temperatureSensor,
   thermostat,
 } from 'matterbridge';
@@ -272,7 +272,7 @@ export class DaikinOnectaPlatform extends MatterbridgeDynamicPlatform {
 
     if (this.onecta.exposeSwitches && state.powerful !== undefined) {
       const pwrSerial = endpointSerial(state.gatewayId, 'PWR');
-      const powerfulSwitch = new MatterbridgeEndpoint(onOffSwitch, { id: pwrSerial })
+      const powerfulSwitch = new MatterbridgeEndpoint(onOffMountedSwitch, { id: pwrSerial })
         .createDefaultBridgedDeviceBasicInformationClusterServer(
           `${state.name} Powerful`,
           pwrSerial,
