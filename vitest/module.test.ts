@@ -14,6 +14,9 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import initializePlugin, { DaikinOnectaPlatform, type DaikinOnectaPlatformConfig } from '../src/module.js';
 import { RateLimitedError, type DaikinCloudDevice, type OnectaBridge } from '../src/onecta.js';
 
+// Fields only present in matterbridge dev; spread in so the mock typechecks against both the released and dev versions
+const systemInformationDev = { constrainedMemory: '0 B' };
+
 const mockMatterbridge: PlatformMatterbridge = {
   systemInformation: {
     interfaceName: 'eth0',
@@ -29,6 +32,7 @@ const mockMatterbridge: PlatformMatterbridge = {
     osArch: 'x64',
     totalMemory: '0 B',
     freeMemory: '0 B',
+    ...systemInformationDev,
     systemUptime: '0s',
     processUptime: '0s',
     cpuUsage: '0%',
